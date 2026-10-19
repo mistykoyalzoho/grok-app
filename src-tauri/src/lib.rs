@@ -50,6 +50,7 @@ mod audit_ledger;
 mod automation_runner;
 
 mod batch_agents;
+mod expert_teams;
 
 mod cc_switch_import;
 

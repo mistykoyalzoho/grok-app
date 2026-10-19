@@ -1449,3 +1449,30 @@ pub async fn batch_agents_headless(
     .map_err(|e| format!("batch_agents_headless: {e}"))
 }
 
+/// Discover shared local expert-team manifests without modifying them.
+#[tauri::command]
+pub async fn expert_teams_list() -> Result<Vec<crate::expert_teams::ExpertTeam>, String> {
+    crate::expert_teams::list()
+}
+
+/// Run a shared expert-team supervisor workflow.
+#[tauri::command]
+pub async fn expert_team_run(
+    app: tauri::AppHandle,
+    team_id: String,
+    task: String,
+    project_path: Option<String>,
+) -> Result<crate::expert_teams::TeamRunResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::expert_teams::run(app, team_id, task, project_path)
+    })
+    .await
+    .map_err(|e| format!("expert_team_run worker failed: {e}"))?
+}
+
+/// Cancel the current expert-team child process.
+#[tauri::command]
+pub async fn expert_team_cancel() -> bool {
+    crate::expert_teams::cancel()
+}
+

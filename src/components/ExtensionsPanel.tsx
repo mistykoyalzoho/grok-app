@@ -78,6 +78,7 @@ import {
   ExtensionsBuildExtras,
   type ExtAgentsTabActions,
 } from "@/components/ExtensionsBuildExtras";
+import { ExpertTeamsPanel } from "@/components/ExpertTeamsPanel";
 import { CustomizeCommandsPanel } from "@/components/CustomizeCommandsPanel";
 import { ProjectRulesModal } from "@/components/ProjectRulesModal";
 import {
@@ -2879,6 +2880,8 @@ export function ExtensionsPanel({
         />
       )}
       {tab === "agents" && (
+        <>
+        <ExpertTeamsPanel locale={locale} projectPath={projectPath} />
         <ExtensionsBuildExtras
           locale={locale}
           projectPath={projectPath}
@@ -2898,6 +2901,7 @@ export function ExtensionsPanel({
             void refresh();
           }}
         />
+        </>
       )}
       </div>
 

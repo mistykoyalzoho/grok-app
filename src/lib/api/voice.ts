@@ -130,6 +130,23 @@ export async function batchAgentsHeadless(opts: {
   });
 }
 
+export type ExpertTeamRole = { id: string; name: string; instructions: string; skills: string[] };
+export type ExpertTeam = { schemaVersion: number; id: string; name: string; description: string; category: string; roles: ExpertTeamRole[]; workflow: string };
+export async function expertTeamsList(): Promise<ExpertTeam[]> {
+  return invoke<ExpertTeam[]>("expert_teams_list");
+}
+export type ExpertTeamRunResult = { ok: boolean; cancelled: boolean; artifactPath: string | null; report: string };
+export async function expertTeamRun(opts: { teamId: string; task: string; projectPath?: string | null }): Promise<ExpertTeamRunResult> {
+  return invoke<ExpertTeamRunResult>("expert_team_run", {
+    teamId: opts.teamId,
+    task: opts.task,
+    projectPath: opts.projectPath ?? null,
+  });
+}
+export async function expertTeamCancel(): Promise<boolean> {
+  return invoke<boolean>("expert_team_cancel");
+}
+
 export type VoiceStatusDto = {
   available: boolean;
   reason?: string | null;

@@ -407,6 +407,60 @@
   border-bottom: 0;
 }
 
+.expert-teams {
+  margin-bottom: 16px;
+}
+
+.expert-teams__search {
+  margin: 8px 0;
+}
+
+.expert-teams__choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.expert-teams__choice span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.expert-teams__choice small,
+.expert-teams__result small {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.expert-teams__task-label {
+  display: block;
+  margin: 12px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.expert-teams__result {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.expert-teams__result pre {
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.expert-teams__result .markdown-body {
+  max-height: 320px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+
 /* Alerts keep breathing room */
 .ext-ref-shell > .ext-alert {
   margin: 0 0 14px;

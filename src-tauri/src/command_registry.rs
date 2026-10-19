@@ -484,6 +484,9 @@ pub fn app_invoke_handler(
         // ── Streaming probe, batch agents & X evidence ──
         commands::streaming_messages_json_probe,
         commands::batch_agents_headless,
+        commands::expert_teams_list,
+        commands::expert_team_run,
+        commands::expert_team_cancel,
         commands::x_evidence_search,
         commands::x_evidence_list,
         commands::x_evidence_get,
