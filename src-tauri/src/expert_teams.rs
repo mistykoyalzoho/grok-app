@@ -1,11 +1,13 @@
 //! Shared expert-team manifest discovery and cancellable supervisor runs.
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+#[cfg(unix)]
 use std::os::unix::process::CommandExt;
 use std::{
     fs,
-    io::Read,
-    path::PathBuf,
+    io::{Read, Write},
+    path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     sync::{
         atomic::{AtomicBool, AtomicI32, Ordering},
@@ -358,6 +360,21 @@ fn build_role_prompt(
     )
 }
 
+fn write_private_artifact(path: &Path, body: &str) -> Result<(), String> {
+    let dir = path.parent().ok_or("artifact path has no parent")?;
+    fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    fs::set_permissions(dir, fs::Permissions::from_mode(0o700)).map_err(|e| e.to_string())?;
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    options.mode(0o600);
+    options
+        .open(path)
+        .and_then(|mut file| file.write_all(body.as_bytes()))
+        .map_err(|e| e.to_string())
+}
+
 pub fn run(
     app: tauri::AppHandle,
     team_id: String,
@@ -467,17 +484,16 @@ pub fn run(
             .map(PathBuf::from)
             .ok_or("HOME unavailable")?
             .join(".grok-app/expert-team-runs");
-        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         let path = dir.join(format!(
             "{}-{}.md",
             team.id,
-            chrono::Utc::now().format("%Y%m%dT%H%M%SZ")
+            chrono::Utc::now().format("%Y%m%dT%H%M%S%.3fZ")
         ));
         let body = format!(
             "# {}\n\nTask: {}\n\n{}\n\n## Role contributions\n\n{}\n",
             team.name, task, report, contributions
         );
-        fs::write(&path, body).map_err(|e| e.to_string())?;
+        write_private_artifact(&path, &body)?;
         Ok(TeamRunResult {
             ok: all_roles_ok,
             cancelled: false,
@@ -632,5 +648,24 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.contains("prompt exceeds 96 KiB"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn artifacts_are_private_and_never_overwritten() {
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path().join("runs");
+        let path = dir.join("team-run.md");
+        write_private_artifact(&path, "private report").unwrap();
+        assert_eq!(
+            fs::metadata(&dir).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        assert_eq!(
+            fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert!(write_private_artifact(&path, "replacement").is_err());
+        assert_eq!(fs::read_to_string(path).unwrap(), "private report");
     }
 }
