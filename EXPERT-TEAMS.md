@@ -15,7 +15,7 @@ This slice consumes local team manifests and local skills. It does not add a rem
 - Artifact privacy fix: `39d5b5be96e763e3c812a8b930e961fd9efd5b13` (`fix: protect expert team run artifacts`).
 - `cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check`: passed.
 - `CARGO_BUILD_JOBS=2 cargo test --manifest-path src-tauri/Cargo.toml -p grok-app expert_teams --lib`: passed, 6 tests, 0 failed. The test suite covers manifest identity/role bounds, prior-role and skill context, bounded output, prompt limits, fake CLI success/failure/process-tree cancellation, and private non-overwriting artifacts.
-- `pnpm typecheck`: ran without diagnostics in this session; the command was still active when this receipt was prepared. Earlier feature verification also passed typecheck before the final test-only dependency declaration.
+- `pnpm typecheck`: passed with exit code 0 after the final test-only dependency declaration.
 
 ## Intel release and installation
 
