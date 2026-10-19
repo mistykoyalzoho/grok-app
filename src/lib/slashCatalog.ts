@@ -37,6 +37,17 @@ export type SkillInfo = {
 };
 
 /**
+ * One row from `grok plugin list` — the same list the Extensions Installed
+ * strip counts. `repoKey` / `path` are the install-directory id (often
+ * `<name>-<hash>`), which skill paths use even when `name` is the short id.
+ */
+export type InstalledPluginInfo = {
+  name: string;
+  repoKey?: string | null;
+  path?: string | null;
+};
+
+/**
  * Skills shown in composer `+` / `/` pickers.
  * Keeps only enabled + user-invocable skills with a non-empty name.
  * Name collision (case-insensitive): project source wins over global/user.
@@ -105,48 +116,176 @@ export function resolveSkillPluginName(skill: SkillInfo): string | null {
   return inferPluginNameFromPath(skill.path);
 }
 
+function pushUniqueSkill(list: string[], name: string): void {
+  if (!list.some((n) => n.toLowerCase() === name.toLowerCase())) {
+    list.push(name);
+  }
+}
+
+function pathLeaf(path: string | null | undefined): string | null {
+  if (!path) return null;
+  const leaf =
+    path
+      .replace(/\\/g, "/")
+      .replace(/\/+$/, "")
+      .split("/")
+      .pop()
+      ?.trim() ?? "";
+  return leaf || null;
+}
+
+/** Installed name, repo key, and install-folder leaf. Original casing, deduped. */
+function installedPluginMatchKeys(plugin: InstalledPluginInfo): string[] {
+  const keys: string[] = [];
+  const push = (raw: string | null | undefined) => {
+    const value = (raw ?? "").trim();
+    if (!value) return;
+    if (keys.some((k) => k.toLowerCase() === value.toLowerCase())) return;
+    keys.push(value);
+  };
+  push(plugin.name);
+  push(plugin.repoKey);
+  push(pathLeaf(plugin.path));
+  return keys;
+}
+
+function dedupeInstalledPlugins(
+  installed: readonly InstalledPluginInfo[],
+): InstalledPluginInfo[] {
+  const seen = new Set<string>();
+  const out: InstalledPluginInfo[] = [];
+  for (const plugin of installed) {
+    const name = (plugin?.name ?? "").trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      name,
+      repoKey: plugin.repoKey ?? null,
+      path: plugin.path ?? null,
+    });
+  }
+  return out;
+}
+
+function skillMatchesInstalled(
+  skill: SkillInfo,
+  plugin: InstalledPluginInfo,
+): boolean {
+  const ids = new Set(
+    installedPluginMatchKeys(plugin).map((k) => k.toLowerCase()),
+  );
+  if (ids.size === 0) return false;
+  const explicit = (skill.pluginName ?? "").trim().toLowerCase();
+  if (explicit && ids.has(explicit)) return true;
+  const inferred = inferPluginNameFromPath(skill.path);
+  return !!inferred && ids.has(inferred.toLowerCase());
+}
+
+function invocableSkillsForPlugin(
+  skills: readonly SkillInfo[],
+  plugin: InstalledPluginInfo,
+): string[] {
+  const names: string[] = [];
+  for (const skill of skills) {
+    if (!skillMatchesInstalled(skill, plugin)) continue;
+    pushUniqueSkill(names, skill.name);
+  }
+  return names;
+}
+
 /** plugin id → enabled + invocable skill names, insertion order. */
-export function pluginSkillsMap(skills: SkillInfo[]): Record<string, string[]> {
+export function pluginSkillsMap(
+  skills: SkillInfo[],
+  installedPlugins?: readonly InstalledPluginInfo[] | null,
+): Record<string, string[]> {
+  const picker = filterPickerSkills(skills);
+  if (installedPlugins == null) {
+    const map: Record<string, string[]> = {};
+    for (const s of picker) {
+      const plugin = resolveSkillPluginName(s);
+      if (!plugin) continue;
+      const list = map[plugin] ?? (map[plugin] = []);
+      pushUniqueSkill(list, s.name);
+    }
+    return map;
+  }
   const map: Record<string, string[]> = {};
-  for (const s of filterPickerSkills(skills)) {
-    const plugin = resolveSkillPluginName(s);
-    if (!plugin) continue;
-    const list = map[plugin] ?? (map[plugin] = []);
-    if (!list.some((n) => n.toLowerCase() === s.name.toLowerCase())) {
-      list.push(s.name);
+  for (const plugin of dedupeInstalledPlugins(installedPlugins)) {
+    const names = invocableSkillsForPlugin(picker, plugin);
+    if (names.length === 0) continue;
+    for (const key of installedPluginMatchKeys(plugin)) {
+      map[key] = names;
     }
   }
   return map;
 }
 
-/** One slash row per plugin pack that still has invocable skills. */
-export function pluginsToSlashItems(skills: SkillInfo[]): SlashItem[] {
+function pluginSlashItem(name: string, aliases: string[]): SlashItem {
+  return {
+    id: `plugin:${name}`,
+    kind: "plugin",
+    name,
+    displayTitle: name,
+    descriptionKey: "slash.pluginDesc",
+    aliases,
+    pluginName: name,
+    source: "plugin",
+  };
+}
+
+/**
+ * Plugin rows from skill-path inference only.
+ * Packs with no enabled user-invocable skills are omitted.
+ * Used when the installed list failed to load so the menu does not go blank.
+ */
+function pluginsToSlashItemsFromSkills(skills: SkillInfo[]): SlashItem[] {
   const groups = new Map<string, string[]>();
   for (const s of filterPickerSkills(skills)) {
     const plugin = resolveSkillPluginName(s);
     if (!plugin) continue;
     const list = groups.get(plugin) ?? [];
-    if (!list.some((n) => n.toLowerCase() === s.name.toLowerCase())) {
-      list.push(s.name);
-    }
+    pushUniqueSkill(list, s.name);
     groups.set(plugin, list);
   }
   const items: SlashItem[] = [];
   for (const [name, aliases] of groups) {
     if (aliases.length === 0) continue;
-    items.push({
-      id: `plugin:${name}`,
-      kind: "plugin",
-      name,
-      displayTitle: name,
-      descriptionKey: "slash.pluginDesc",
-      aliases,
-      pluginName: name,
-      source: "plugin",
-    });
+    items.push(pluginSlashItem(name, aliases));
   }
   items.sort((a, b) => a.name.localeCompare(b.name));
   return items;
+}
+
+/**
+ * One Plugin row per installed plugin name (the Installed strip's list).
+ * Includes packs with zero invocable skills. Skill-path hash folders
+ * (`adobe-c2584161`) attach to that installed name and do not add a second row.
+ */
+function pluginsToSlashItemsFromInstalled(
+  skills: SkillInfo[],
+  installedPlugins: readonly InstalledPluginInfo[],
+): SlashItem[] {
+  const picker = filterPickerSkills(skills);
+  const items = dedupeInstalledPlugins(installedPlugins).map((plugin) =>
+    pluginSlashItem(plugin.name, invocableSkillsForPlugin(picker, plugin)),
+  );
+  items.sort((a, b) => a.name.localeCompare(b.name));
+  return items;
+}
+
+/**
+ * Plugin rows for the `+` menu and `/` palette.
+ * `installedPlugins === undefined | null` means the list did not load:
+ * fall back to skill-derived rows. An array (including empty) is authoritative.
+ */
+export function pluginsToSlashItems(
+  skills: SkillInfo[],
+  installedPlugins?: readonly InstalledPluginInfo[] | null,
+): SlashItem[] {
+  if (installedPlugins == null) return pluginsToSlashItemsFromSkills(skills);
+  return pluginsToSlashItemsFromInstalled(skills, installedPlugins);
 }
 
 /** Built-in slash commands (modes, prompts, host actions). */
@@ -624,14 +763,24 @@ export function filterSlashItems(
   return visible.map((row) => row.item);
 }
 
-/** Full catalog split into built-in commands and skill items. */
-export function buildSlashCatalog(skills: SkillInfo[]): {
+/**
+ * Full catalog split into built-in commands and skill items.
+ * Pass the installed-plugin list so Plugin rows match the Installed strip.
+ * Omit it (or pass null) when that list failed to load.
+ */
+export function buildSlashCatalog(
+  skills: SkillInfo[],
+  installedPlugins?: readonly InstalledPluginInfo[] | null,
+): {
   commands: SlashItem[];
   skills: SlashItem[];
 } {
   return {
     commands: builtinSlashItems(),
-    skills: [...pluginsToSlashItems(skills), ...skillsToSlashItems(skills)],
+    skills: [
+      ...pluginsToSlashItems(skills, installedPlugins),
+      ...skillsToSlashItems(skills),
+    ],
   };
 }
 

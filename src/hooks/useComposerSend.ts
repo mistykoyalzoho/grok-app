@@ -57,7 +57,11 @@ import {
   parseStoredContentWithRefs,
   serializeForAgent,
 } from "@/lib/draftDoc";
-import { pluginSkillsMap, type SkillInfo } from "@/lib/slashCatalog";
+import {
+  pluginSkillsMap,
+  type InstalledPluginInfo,
+  type SkillInfo,
+} from "@/lib/slashCatalog";
 import { countDraftChars } from "@/lib/draftStats";
 import {
   isActiveJsonSchema,
@@ -122,6 +126,8 @@ export type ComposerSendHost = {
   chatAttachments: ChatRef[];
   quotes: ComposerQuote[];
   skillInfos: SkillInfo[];
+  /** null = installed list unavailable; send keeps skill-path plugin expansion. */
+  installedPlugins?: readonly InstalledPluginInfo[] | null;
   editSubmitting: boolean;
   editingUserMessageId: string | null;
   isPlaceholderTitle: (title: string | undefined | null) => boolean;
@@ -211,6 +217,7 @@ export function useComposerSend(host: ComposerSendHost) {
     chatAttachments,
     quotes,
     skillInfos,
+    installedPlugins,
     editSubmitting,
     editingUserMessageId,
     isPlaceholderTitle,
@@ -335,7 +342,7 @@ const executeSend = async (opts: {
   const viewingTarget = () =>
     isViewingSendTarget(originView, currentViewFocus(), sendTargetId);
 
-  const pluginSkills = pluginSkillsMap(skillInfos);
+  const pluginSkills = pluginSkillsMap(skillInfos, installedPlugins);
   const agentBody = serializeQuotesForAgent(
     quotesForSend,
     serializeForAgent(segments, { goalMode: useGoal, pluginSkills }),

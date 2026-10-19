@@ -26,7 +26,11 @@ import type { Attachment } from "@/lib/attachments";
 import type { ChatRef } from "@/lib/chatAttach";
 import type { ComposerQuote } from "@/lib/composerQuotes";
 import type { ComposerAtFileEntry } from "@/components/ComposerAtPanel";
-import type { SlashKindFilter, SkillInfo } from "@/lib/slashCatalog";
+import type {
+  InstalledPluginInfo,
+  SlashKindFilter,
+  SkillInfo,
+} from "@/lib/slashCatalog";
 import type { PromptHistoryScope } from "@/components/PromptHistoryPanel";
 import {
   loadRecentPromptHistory,
@@ -154,6 +158,13 @@ export function useComposerController(initialDraft = "") {
   promptHistoryOpenRef.current = promptHistoryOpen;
 
   const [skillInfos, setSkillInfos] = useState<SkillInfo[]>([]);
+  /**
+   * Installed plugins for the slash Plugin chip.
+   * `null` = not loaded or the list failed (catalog falls back to skill paths).
+   */
+  const [installedPlugins, setInstalledPlugins] = useState<
+    InstalledPluginInfo[] | null
+  >(null);
   const [skillsLoading, setSkillsLoading] = useState(false);
   /** Host `skills_list` error (CLI missing / inspect fail); empty when ok. */
   const [skillsLoadError, setSkillsLoadError] = useState<string | null>(null);
@@ -516,6 +527,8 @@ export function useComposerController(initialDraft = "") {
       promptHistoryOpenRef,
       skillInfos,
       setSkillInfos,
+      installedPlugins,
+      setInstalledPlugins,
       skillsLoading,
       setSkillsLoading,
       skillsLoadError,
@@ -582,6 +595,7 @@ export function useComposerController(initialDraft = "") {
       recentPromptHistory,
       promptHistoryClearOpen,
       skillInfos,
+      installedPlugins,
       skillsLoading,
       skillsLoadError,
       slashQuery,

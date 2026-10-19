@@ -446,8 +446,10 @@ import {
   buildSlashCatalog,
   countSlashByKind,
   flattenFilteredCatalog,
+  type InstalledPluginInfo,
   type SlashItem,
 } from "@/lib/slashCatalog";
+import { loadPluginsListCached } from "@/lib/pluginsListCache";
 import { parseContextInfoPayload } from "@/lib/contextInfoSnapshot";
 import {
   contextWindowSlashFeedback,
@@ -1045,6 +1047,8 @@ export function AppWorkbench() {
     promptHistoryOpenRef,
     skillInfos,
     setSkillInfos,
+    installedPlugins,
+    setInstalledPlugins,
     skillsLoading,
     setSkillsLoading,
     skillsLoadError,
@@ -5645,6 +5649,7 @@ export function AppWorkbench() {
     chatAttachments,
     quotes,
     skillInfos,
+    installedPlugins,
     editSubmitting,
     editingUserMessageId,
     isPlaceholderTitle,
@@ -6305,6 +6310,8 @@ export function AppWorkbench() {
   /** Bumped when Extensions skill toggles change, or chat installs skills, so slash palette reloads. */
   const [skillsReloadToken, setSkillsReloadToken] = useState(0);
   skillsReloadBumpRef.current = () => setSkillsReloadToken((n) => n + 1);
+  /** Last skills-reload token we forced a plugin-list refresh for. */
+  const pluginsListReloadSeen = useRef(0);
 
   // Refresh agent definition catalog when the active project changes.
   useEffect(() => {
@@ -6334,6 +6341,8 @@ export function AppWorkbench() {
     if (!api.isTauri()) return;
     let cancelled = false;
     setSkillsLoading(true);
+    const forcePlugins = skillsReloadToken !== pluginsListReloadSeen.current;
+    pluginsListReloadSeen.current = skillsReloadToken;
     void api
       .skillsList(activeProject?.path ?? null, {
         sshAlias: activeProject?.sshAlias ?? null,
@@ -6363,14 +6372,46 @@ export function AppWorkbench() {
       .finally(() => {
         if (!cancelled) setSkillsLoading(false);
       });
+    // Same installed list the Extensions strip counts (`Installed · N`).
+    // A load failure leaves the previous list, or null so Plugin rows stay
+    // skill-derived instead of going blank.
+    void loadPluginsListCached(
+      async () => {
+        try {
+          const r = await api.pluginsList();
+          return {
+            plugins: r.plugins ?? [],
+            error: r.error?.trim() || null,
+          };
+        } catch (e) {
+          return { plugins: [], error: String(e) };
+        }
+      },
+      { force: forcePlugins },
+    )
+      .then((snap) => {
+        if (cancelled) return;
+        if (snap.error) return;
+        const next: InstalledPluginInfo[] = (snap.plugins ?? [])
+          .map((p) => ({
+            name: (p.name ?? "").trim(),
+            repoKey: p.repoKey ?? null,
+            path: p.path ?? null,
+          }))
+          .filter((p) => p.name.length > 0);
+        setInstalledPlugins(next);
+      })
+      .catch(() => {
+        /* keep null / previous list */
+      });
     return () => {
       cancelled = true;
     };
   }, [activeProject?.path, activeProject?.sshAlias, skillsReloadToken, session.sessionId]);
 
   const slashCatalog = useMemo(
-    () => buildSlashCatalog(skillInfos),
-    [skillInfos],
+    () => buildSlashCatalog(skillInfos, installedPlugins),
+    [skillInfos, installedPlugins],
   );
   const resolveSlashTitle = useCallback(
     (item: SlashItem) => {
