@@ -1935,6 +1935,7 @@ dependencies = [
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
  "tauri-winrt-notification",
+ "tempfile",
  "tokio",
  "tokio-rustls",
  "tokio-tungstenite 0.26.2",
