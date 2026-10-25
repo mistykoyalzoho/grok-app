@@ -17,6 +17,11 @@ import {
   type ReactNode,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import { FollowupSuggestions } from "./FollowupSuggestions";
+import {
+  followupsFromTool,
+  latestFollowupTool,
+} from "@/lib/followupSuggestions";
 import type { Locale } from "@/i18n";
 import { createT } from "@/i18n";
 import {
@@ -474,6 +479,8 @@ export interface ConversationThreadProps {
   }) => void;
   /** Resume after host_exit / agent_exit / user_stop (new prompt; not permission RPC). */
   onContinueInterrupted?: (reason: string) => void;
+  /** Send a clicked suggest_followups card as the next user turn. */
+  onSendFollowup?: (prompt: string) => void;
   attachLabels: {
     open: string;
     reveal: string;
@@ -642,6 +649,7 @@ type TranscriptMessageRowProps = {
   onOpenExternalLink?: ConversationThreadProps["onOpenExternalLink"];
   onAddAttachmentToComposer?: ConversationThreadProps["onAddAttachmentToComposer"];
   onContinueInterrupted?: ConversationThreadProps["onContinueInterrupted"];
+  onSendFollowup?: ConversationThreadProps["onSendFollowup"];
   latestContinuableEndId?: string | null;
   onOpenSessionChanges?: ConversationThreadProps["onOpenSessionChanges"];
   onOpenModifiedPath?: ConversationThreadProps["onOpenModifiedPath"];
@@ -680,6 +688,7 @@ function transcriptRowPropsEqual(
   if (a.canEditLastUser !== b.canEditLastUser) return false;
   if (a.canRegenerate !== b.canRegenerate) return false;
   if (a.onContinueInterrupted !== b.onContinueInterrupted) return false;
+  if (a.onSendFollowup !== b.onSendFollowup) return false;
   if (a.latestContinuableEndId !== b.latestContinuableEndId) return false;
   if (a.onOpenSessionChanges !== b.onOpenSessionChanges) return false;
   if (a.onOpenModifiedPath !== b.onOpenModifiedPath) return false;
@@ -774,6 +783,7 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
   onOpenExternalLink,
   onAddAttachmentToComposer,
   onContinueInterrupted,
+  onSendFollowup,
   latestContinuableEndId,
   onOpenSessionChanges,
   onOpenModifiedPath,
@@ -1527,6 +1537,23 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
             />
           ) : null}
           {(() => {
+            const tools = messageSegments(m).filter(
+              (s): s is MessageToolSegment => s.kind === "tool",
+            );
+            const tool = latestFollowupTool(tools);
+            if (!tool) return null;
+            const items = followupsFromTool(tool);
+            if (!items.length) return null;
+            return (
+              <FollowupSuggestions
+                toolCallId={tool.toolCallId || m.id}
+                items={items}
+                disabled={!!m.streaming || turnLive || !onSendFollowup}
+                onSend={onSendFollowup}
+              />
+            );
+          })()}
+          {(() => {
             if (m.streaming || !showReplyLength) return null;
             const stats = computeMessageLength(m.content);
             if (stats.empty) return null;
@@ -1700,6 +1727,7 @@ export function ConversationThread({
   onAddAttachmentToComposer,
   onAddQuote,
   onContinueInterrupted,
+  onSendFollowup,
   attachLabels,
   findQuery = "",
   findHitMessageIds,
@@ -2963,6 +2991,7 @@ export function ConversationThread({
               onOpenExternalLink={onOpenExternalLink}
               onAddAttachmentToComposer={onAddAttachmentToComposer}
               onContinueInterrupted={onContinueInterrupted}
+              onSendFollowup={onSendFollowup}
               latestContinuableEndId={latestContinuableEndId}
               onOpenSessionChanges={onOpenSessionChanges}
               onOpenModifiedPath={onOpenModifiedPath}

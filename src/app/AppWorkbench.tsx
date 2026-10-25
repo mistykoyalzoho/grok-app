@@ -12819,6 +12819,13 @@ export function AppWorkbench() {
             onThreadAddAttachmentToComposer={onThreadAddAttachmentToComposer}
             onThreadAddQuote={onThreadAddQuote}
             onThreadContinueInterrupted={onThreadContinueInterrupted}
+            onSendFollowup={(prompt) => {
+              void executeSend({
+                storedDisplay: prompt,
+                att: [],
+                goalMode,
+              });
+            }}
             endAndContinueBusy={endAndContinueBusy}
             onStallEndAndContinue={(sid) => {
               void endAndContinue(sid);

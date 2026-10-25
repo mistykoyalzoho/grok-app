@@ -511,6 +511,38 @@ html[data-msg-actions="hover"]
 }
 
 /* Settings → Appearance: muted word/char count under finished assistant replies */
+.lobe-followups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.lobe-followups__btn {
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.14));
+  background: var(--surface-2, rgba(255, 255, 255, 0.04));
+  color: var(--text-primary, inherit);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.lobe-followups__btn span {
+  margin-right: 6px;
+}
+
+.lobe-followups__btn:hover:not(:disabled) {
+  border-color: var(--accent, #8dff6a);
+}
+
+.lobe-followups__btn--used,
+.lobe-followups__btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .lobe-chat-reply-length {
   margin-top: 6px;
   font-size: 11px;

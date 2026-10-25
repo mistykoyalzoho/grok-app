@@ -107,6 +107,7 @@ export type WorkbenchChatStageProps = {
     sourceMessageId?: string;
   }) => void;
   onThreadContinueInterrupted: (reason: string) => void;
+  onSendFollowup: (prompt: string) => void;
   endAndContinueBusy: boolean;
   onStallEndAndContinue: (sessionId: string) => void;
   onThreadOpenError: (message: string) => void;
@@ -534,6 +535,7 @@ export function WorkbenchChatStage(p: WorkbenchChatStageProps) {
           >
           <ConversationThreadLive
             onContinueInterrupted={onThreadContinueInterrupted}
+            onSendFollowup={p.onSendFollowup}
             onAddQuote={onThreadAddQuote}
             locale={resolveLocale(locale)}
             sessionState={
