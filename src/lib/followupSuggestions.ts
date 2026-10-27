@@ -14,15 +14,32 @@ type ToolLike = {
 };
 
 export function isFollowupTool(tool: ToolLike): boolean {
-  const blob = `${tool.title ?? ""} ${tool.toolKind ?? ""}`;
+  const blob = `${tool.title ?? ""} ${tool.toolKind ?? ""} ${tool.input ?? ""} ${tool.detail ?? ""}`;
   return /suggest_followups/i.test(blob);
 }
 
+function unwrapFollowupValue(value: unknown, depth = 0): unknown {
+  if (!value || typeof value !== "object" || depth > 4) return value;
+  const record = value as { followups?: unknown; tool_input?: unknown; arguments?: unknown };
+  if (Array.isArray(record.followups)) return value;
+  const inner = record.tool_input ?? record.arguments;
+  if (typeof inner === "string") {
+    try {
+      return unwrapFollowupValue(JSON.parse(inner), depth + 1);
+    } catch {
+      return value;
+    }
+  }
+  if (inner && typeof inner === "object") return unwrapFollowupValue(inner, depth + 1);
+  return value;
+}
+
 function asItems(value: unknown): FollowupItem[] {
-  const list = Array.isArray(value)
-    ? value
-    : value && typeof value === "object" && Array.isArray((value as { followups?: unknown }).followups)
-      ? (value as { followups: unknown[] }).followups
+  const unwrapped = unwrapFollowupValue(value);
+  const list = Array.isArray(unwrapped)
+    ? unwrapped
+    : unwrapped && typeof unwrapped === "object" && Array.isArray((unwrapped as { followups?: unknown }).followups)
+      ? (unwrapped as { followups: unknown[] }).followups
       : null;
   if (!list) return [];
   const out: FollowupItem[] = [];

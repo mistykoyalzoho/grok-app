@@ -611,6 +611,11 @@ pub(crate) fn extract_tool_input(raw: &serde_json::Value) -> Option<String> {
         }
     }
     let obj = ri.as_object()?;
+    // suggest_followups (direct, or Grok's use_tool envelope) has no path or
+    // command. Keep the argument JSON so the chat can draw the cards.
+    if let Some(json) = followup_call_argument(ri) {
+        return Some(json);
+    }
     const ORDER: [&str; 11] = [
         "target_file",
         "target_directory",
@@ -1008,6 +1013,53 @@ pub(super) fn persist_completed_tool_journal_for_test(job: PendingCompletedToolJ
     if let Some(ref hook) = *TOOL_JOURNAL_PERSIST_TEST_HOOK.lock() {
         hook(&job);
     }
+}
+
+/// `input:` journal line. Follow-up prompts are the whole card, so they keep a
+/// much larger one-line budget than a path or a shell command.
+pub(super) fn tool_journal_input_line(raw: &str) -> String {
+    let max = if raw.contains("suggest_followups") || raw.contains("\"followups\"") {
+        12_000
+    } else {
+        400
+    };
+    tool_journal_one_line(raw, max)
+}
+
+fn followup_call_argument(raw_input: &serde_json::Value) -> Option<String> {
+    let obj = raw_input.as_object()?;
+    let tool_name = obj
+        .get("tool_name")
+        .or_else(|| obj.get("name"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    if tool_name.to_ascii_lowercase().contains("suggest_followups") {
+        return serde_json::to_string(raw_input).ok();
+    }
+    if followups_array_is_prompts(obj.get("followups")) {
+        return serde_json::to_string(raw_input).ok();
+    }
+    if let Some(inner) = obj.get("tool_input") {
+        if followups_array_is_prompts(inner.get("followups"))
+            || inner
+                .as_str()
+                .is_some_and(|s| s.to_ascii_lowercase().contains("suggest_followups"))
+        {
+            return serde_json::to_string(raw_input).ok();
+        }
+    }
+    None
+}
+
+fn followups_array_is_prompts(value: Option<&serde_json::Value>) -> bool {
+    let Some(list) = value.and_then(|v| v.as_array()) else {
+        return false;
+    };
+    list.iter().any(|item| {
+        item.get("prompt")
+            .and_then(|p| p.as_str())
+            .is_some_and(|s| !s.trim().is_empty())
+    })
 }
 
 /// Collapse newlines/whitespace so `tool_step|status|kind|title` stays one line.

@@ -467,7 +467,7 @@ impl SessionManager {
                                 content.push('\n');
                                 content.push_str("input:");
                                 // One line only so `input:` is always rest[0] for the parser.
-                                content.push_str(&tool_journal_one_line(inp, 400));
+                                content.push_str(&tool_journal_input_line(inp));
                             }
                             if let Some(ref d) = detail {
                                 content.push('\n');

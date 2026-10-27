@@ -1548,6 +1548,7 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
               <FollowupSuggestions
                 toolCallId={tool.toolCallId || m.id}
                 items={items}
+                locale={locale}
                 disabled={!!m.streaming || turnLive || !onSendFollowup}
                 onSend={onSendFollowup}
               />

@@ -286,6 +286,31 @@ fn session_load_replay_gate_matches_prompt_in_flight() {
 }
 
 #[test]
+fn extract_tool_input_keeps_suggest_followups_argument() {
+    let direct = serde_json::json!({
+        "rawInput": { "followups": [{ "label": "Studio", "prompt": "Open the studio" }] }
+    });
+    let direct_in = extract_tool_input(&direct).expect("direct followups");
+    assert!(direct_in.contains("Open the studio"));
+    assert!(direct_in.contains("\"followups\""));
+
+    let wrapped = serde_json::json!({
+        "rawInput": {
+            "tool_name": "codebuff__suggest_followups",
+            "tool_input": {
+                "followups": [{ "label": "Next", "prompt": "Send the full prompt" }]
+            }
+        }
+    });
+    let wrapped_in = extract_tool_input(&wrapped).expect("use_tool envelope");
+    assert!(wrapped_in.contains("suggest_followups"));
+    assert!(wrapped_in.contains("Send the full prompt"));
+
+    let command = serde_json::json!({ "rawInput": { "command": "pwd" } });
+    assert_eq!(extract_tool_input(&command).as_deref(), Some("pwd"));
+}
+
+#[test]
 fn extract_tool_input_accepts_bare_string_raw_input() {
     // Shell wrappers may send rawInput as a plain string (not an object).
     let bare = serde_json::json!({ "rawInput": "ls -la /tmp" });
